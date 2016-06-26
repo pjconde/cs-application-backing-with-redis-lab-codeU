@@ -68,7 +68,8 @@ public class JedisIndex {
 	 */
 	public Set<String> getURLs(String term) {
         // FILL THIS IN!
-		return null;
+        Set<String> output = jedis.smembers(urlSetKey(term));
+		return output;
 	}
 
     /**
@@ -79,7 +80,14 @@ public class JedisIndex {
 	 */
 	public Map<String, Integer> getCounts(String term) {
         // FILL THIS IN!
-		return null;
+        Map<String, Integer> output = new HashMap<>();
+        Set<String> urlSet = getURLs(term);
+
+        for (String url : urlSet) {
+        	Integer count = getCount(url, term);
+        	output.put(url, count);
+        }
+		return output;
 	}
 
     /**
@@ -91,7 +99,9 @@ public class JedisIndex {
 	 */
 	public Integer getCount(String url, String term) {
         // FILL THIS IN!
-		return null;
+        // This is from the Term counter hash set!
+        String key = termCounterKey(url);
+		return new Integer(jedis.hget(key, term));
 	}
 
 
@@ -103,6 +113,30 @@ public class JedisIndex {
 	 */
 	public void indexPage(String url, Elements paragraphs) {
         // FILL THIS IN!
+       	TermCounter tc = new TermCounter(url);
+		tc.processElements(paragraphs);
+		pushtoRedis(tc);
+	}
+
+	private void pushtoRedis(TermCounter tc) {
+		// Allows use of multi which speeds up process
+		// Use t instead of the jedis
+		Transaction t = jedis.multi();
+
+		String url = tc.getLabel();
+		String key = termCounterKey(url);
+
+		for (String term : tc.keySet() ) {
+			// Makes a hash set of 
+			String num = tc.get(term).toString();
+			t.hset(key, term, num);
+
+			// Sets of url keys
+			String urlKey = urlSetKey(term);
+			t.sadd(urlKey, url);
+		}
+		// DON'T FORGET TO CLOSE THE TRANSACTION!!
+		t.exec();
 	}
 
 	/**
@@ -223,9 +257,9 @@ public class JedisIndex {
 		Jedis jedis = JedisMaker.make();
 		JedisIndex index = new JedisIndex(jedis);
 		
-		//index.deleteTermCounters();
-		//index.deleteURLSets();
-		//index.deleteAllKeys();
+		// index.deleteTermCounters();
+		// index.deleteURLSets();
+		// index.deleteAllKeys();
 		loadIndex(index);
 		
 		Map<String, Integer> map = index.getCounts("the");

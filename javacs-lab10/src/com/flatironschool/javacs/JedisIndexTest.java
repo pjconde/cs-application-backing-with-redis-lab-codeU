@@ -33,6 +33,10 @@ public class JedisIndexTest {
 	public void setUp() throws Exception {
 		jedis = JedisMaker.make();
 		index = new JedisIndex(jedis);
+
+		index.deleteTermCounters();
+		index.deleteURLSets();
+		index.deleteAllKeys();
 		
 		loadIndex(index);
 	}
